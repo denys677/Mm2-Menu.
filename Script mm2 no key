@@ -1,0 +1,153 @@
+-- MM2 Custom Menu by Gemini (Fly, Speed, ESP, Autofarm)
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local LP = Players.LocalPlayer
+
+-- Настройки функций
+local Flying = false
+local FastSpeed = false
+local ESP_Active = false
+local Autofarm = false
+
+local FlySpeed = 50
+local NormalSpeed = 16
+local CustomSpeed = 50
+
+-- Создание GUI меню
+local ScreenGui = Instance.new("ScreenGui", game:GetService("CoreGui"))
+local MainFrame = Instance.new("Frame", ScreenGui)
+MainFrame.Size = UDim2.new(0, 160, 0, 220)
+MainFrame.Position = UDim2.new(0.1, 0, 0.3, 0)
+MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+MainFrame.BorderSizePixel = 2
+MainFrame.Active = true
+MainFrame.Draggable = true
+
+local Title = Instance.new("TextLabel", MainFrame)
+Title.Size = UDim2.new(1, 0, 0, 30)
+Title.Text = "MM2 GEMINI MENU"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+Title.TextSize = 14
+
+-- Функция создания красивых кнопок
+local function CreateButton(text, pos, callback)
+    local btn = Instance.new("TextButton", MainFrame)
+    btn.Size = UDim2.new(0, 140, 0, 35)
+    btn.Position = pos
+    btn.Text = text
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    btn.TextSize = 14
+    
+    local state = false
+    btn.MouseButton1Click:Connect(function()
+        state = not state
+        btn.BackgroundColor3 = state and Color3.fromRGB(0, 180, 0) or Color3.fromRGB(50, 50, 50)
+        callback(state)
+    end)
+    return btn
+end
+
+-- 1. ЛОГИКА ПОЛЕТА (FLY)
+local bodyVel, bodyGyro
+CreateButton("Fly: OFF", UDim2.new(0, 10, 0, 40), function(val)
+    Flying = val
+    local root = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+    
+    if Flying then
+        bodyVel = Instance.new("BodyVelocity", root)
+        bodyVel.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+        bodyGyro = Instance.new("BodyGyro", root)
+        bodyGyro.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
+    else
+        if bodyVel then bodyVel:Destroy() end
+        if bodyGyro then bodyGyro:Destroy() end
+        if LP.Character:FindFirstChild("Humanoid") then LP.Character.Humanoid.PlatformStand = false end
+    end
+end)
+
+RunService.RenderStepped:Connect(function()
+    if Flying and LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
+        local root = LP.Character.HumanoidRootPart
+        local cam = workspace.CurrentCamera.CFrame
+        LP.Character.Humanoid.PlatformStand = true
+        root.CFrame = CFrame.new(root.Position, root.Position + cam.LookVector)
+        bodyVel.Velocity = cam.LookVector * FlySpeed
+        bodyGyro.CFrame = cam
+    end
+end)
+
+-- 2. ЛОГИКА СКОРОСТИ (SPEED)
+CreateButton("Speed: OFF", UDim2.new(0, 10, 0, 85), function(val)
+    FastSpeed = val
+end)
+
+RunService.Heartbeat:Connect(function()
+    if LP.Character and LP.Character:FindFirstChild("Humanoid") then
+        LP.Character.Humanoid.WalkSpeed = FastSpeed and CustomSpeed or NormalSpeed
+    end
+end)
+
+-- 3. ЛОГИКА ESP (ШЕРИФ И МАРДЕР)
+CreateButton("ESP: OFF", UDim2.new(0, 10, 0, 130), function(val)
+    ESP_Active = val
+    if not val then
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p.Character and p.Character:FindFirstChild("Highlight") then
+                p.Character.Highlight:Destroy()
+            end
+        end
+    end
+end)
+
+RunService.Heartbeat:Connect(function()
+    if not ESP_Active then return end
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LP and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+            -- Проверяем роль по оружию в руках или рюкзаке
+            local isMurder = p.Backpack:FindFirstChild("Knife") or p.Character:FindFirstChild("Knife")
+            local isSheriff = p.Backpack:FindFirstChild("Gun") or p.Character:FindFirstChild("Gun")
+            
+            local highlight = p.Character:FindFirstChild("Highlight")
+            if not highlight then
+                highlight = Instance.new("Highlight", p.Character)
+                highlight.FillOpacity = 0.5
+                highlight.OutlineOpacity = 1
+            end
+            
+            if isMurder then
+                highlight.FillColor = Color3.fromRGB(255, 0, 0) -- Красный Мардер
+                highlight.OutlineColor = Color3.fromRGB(255, 0, 0)
+            elseif isSheriff then
+                highlight.FillColor = Color3.fromRGB(0, 0, 255) -- Синий Шериф
+                highlight.OutlineColor = Color3.fromRGB(0, 0, 255)
+            else
+                highlight.FillColor = Color3.fromRGB(0, 255, 0) -- Зеленый мирный
+                highlight.OutlineColor = Color3.fromRGB(0, 255, 0)
+            end
+        end
+    end
+end)
+
+-- 4. ЛОГИКА АВТОФАРМА МОНЕТ
+CreateButton("Autofarm: OFF", UDim2.new(0, 10, 0, 175), function(val)
+    Autofarm = val
+end)
+
+task.spawn(function()
+    while task.wait(0.5) do
+        if Autofarm and LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
+            local container = workspace:FindFirstChild("Normal") or workspace:FindFirstChild("CoinContainer")
+            if container then
+                local coin = container:FindFirstChild("Coin_Cent", true) or container:FindFirstChild("Coin", true)
+                if coin and coin:FindFirstChild("TouchInterest") then
+                    LP.Character.HumanoidRootPart.CFrame = coin.CFrame
+                end
+            end
+        end
+    end
+end)
